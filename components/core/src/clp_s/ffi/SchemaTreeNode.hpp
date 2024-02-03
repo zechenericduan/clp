@@ -1,6 +1,7 @@
 #ifndef CLP_S_FFI_SCHEMA_TREE_NODE_HPP
 #define CLP_S_FFI_SCHEMA_TREE_NODE_HPP
 
+#include <cstdint>
 #include <string>
 #include <vector>
 

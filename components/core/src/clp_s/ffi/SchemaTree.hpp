@@ -107,7 +107,7 @@ public:
             if (node.get_key_name() == location.get_key_name()
                 && node.get_type() == location.get_type())
             {
-                node_id = node.get_id();
+                node_id = child_id;
                 return true;
             }
         }
@@ -132,6 +132,7 @@ public:
                 location.get_key_name(),
                 location.get_type()
         );
+        m_tree_nodes[location.get_parent_id()].add_child(node_id);
         return node_id;
     }
 
