@@ -398,8 +398,8 @@ auto serialize_key_value_pair_records(
         auto const& [key, val]{curr.get_element()};
         SchemaTreeNode::Type schema_tree_node_type{};
         if (false == convert_msgpack_value_to_schema_tree_node_type(val, schema_tree_node_type)) {
-            serialization_buf.m_schema_tree.revert();
-            return false;
+            failure = true;
+            break;
         }
         SchemaTree::TreeNodeLocator locator{
                 curr.get_parent_id(),
@@ -435,6 +435,7 @@ auto serialize_key_value_pair_records(
                 break;
             }
         }
+        curr.advance();
     }
 
     if (failure) {
