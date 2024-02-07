@@ -1,12 +1,21 @@
-#include <Catch2/single_include/catch2/catch.hpp>
+#include <fstream>
+#include <iostream>
+#include <msgpack.hpp>
 
+#include <Catch2/single_include/catch2/catch.hpp>
+#include <json/single_include/nlohmann/json.hpp>
+
+#include "../src/clp_s/ffi/ir_stream/SerializationBuffer.hpp"
+#include "../src/clp_s/ffi/ir_stream/utils.hpp"
 #include "../src/clp_s/ffi/SchemaTree.hpp"
 #include "../src/clp_s/ffi/SchemaTreeNode.hpp"
 
+using clp_s::ffi::ir_stream::append_msgpack_array_to_json_str;
+using clp_s::ffi::ir_stream::append_msgpack_map_to_json_str;
 using clp_s::ffi::SchemaTree;
 using clp_s::ffi::SchemaTreeNode;
 
-TEST_CASE("schema_tree", "[ffi]") {
+TEST_CASE("schema_tree", "[ffi][structured]") {
     SchemaTree schema_tree;
 
     auto test_node = [&schema_tree](
@@ -65,3 +74,93 @@ TEST_CASE("schema_tree", "[ffi]") {
     test_node(4, "d", SchemaTreeNode::Type::Array, 7, true);
     test_node(4, "d", SchemaTreeNode::Type::Str, 8, true);
 }
+
+TEST_CASE("append_json_str", "[ffi][structured]") {
+    nlohmann::json const json_array
+            = {1,
+               0.11111,
+               false,
+               "This is a string",
+               nullptr,
+               {{"key0", "This is a key value pair record"},
+                {"key1", "Key value pair record again, lol"}},
+               {-1,
+                -0.11111,
+                false,
+                "This is a string",
+                nullptr,
+                {{"key0", "This is a key value pair record"},
+                 {"inner_key0", {{"inner_key1", "inner"}, {"inner_key2", {{"inner_key3", -4}}}}},
+                 {"key1", {1, 0.11111, false, nullptr}}}}};
+    auto const msgpack_data{nlohmann::json::to_msgpack(json_array)};
+    msgpack::object_handle oh;
+    msgpack::unpack(oh, reinterpret_cast<char const*>(msgpack_data.data()), msgpack_data.size());
+
+    std::string json_array_str;
+    REQUIRE(append_msgpack_array_to_json_str(oh.get(), json_array_str));
+    auto const converted_json_array = nlohmann::json::parse(json_array_str);
+    REQUIRE(converted_json_array == json_array);
+}
+
+void traverse(msgpack::object const& obj) {
+    switch (obj.type) {
+        case msgpack::type::MAP: {
+            msgpack::object_map map = obj.via.map;
+            for (uint32_t i = 0; i < map.size; ++i) {
+                msgpack::object_kv kv = map.ptr[i];
+                std::string key;
+                kv.key.convert(key);  // Assuming keys are strings
+                std::cout << "Key: " << key << std::endl;
+                traverse(kv.val);  // Recursively traverse the value
+            }
+            break;
+        }
+        case msgpack::type::ARRAY: {
+            msgpack::object_array array = obj.via.array;
+            for (uint32_t i = 0; i < array.size; ++i) {
+                traverse(array.ptr[i]);  // Recursively traverse each item
+            }
+            break;
+        }
+        case msgpack::type::NIL:
+            std::cout << "Null" << std::endl;
+            break;
+        case msgpack::type::BOOLEAN:
+            std::cout << "Boolean: " << obj.as<bool>() << std::endl;
+            break;
+        case msgpack::type::POSITIVE_INTEGER:
+            std::cout << "Positive Integer: " << obj.as<uint64_t>() << std::endl;
+            break;
+        case msgpack::type::NEGATIVE_INTEGER:
+            std::cout << "Negative Integer: " << obj.as<int64_t>() << std::endl;
+            break;
+        case msgpack::type::FLOAT:
+            std::cout << "Float: " << obj.as<double>() << std::endl;
+            break;
+        case msgpack::type::STR:
+            std::cout << "String: " << obj.as<std::string>() << std::endl;
+            break;
+        // Add cases for other types as needed (e.g., binary, ext)
+        default:
+            std::cout << "Unhandled type" << std::endl;
+    }
+}
+
+TEST_CASE("msgpack", "[ffi][structured]") {
+    std::string const file_path{"msgpack/test.json"};
+    std::ifstream f{file_path};
+    nlohmann::json data{nlohmann::json::parse(f)};
+    auto const msgpack_data{nlohmann::json::to_msgpack(data)};
+    msgpack::object_handle oh;
+    msgpack::unpack(oh, reinterpret_cast<char const*>(msgpack_data.data()), msgpack_data.size());
+    traverse(oh.get());
+}
+
+// TEST_CASE("json_transform", "[ffi][structured]") {
+
+//     nlohmann::json data = nlohmann::json::parse(f);
+//     for (auto const& item : data) {
+
+//         std::cerr << item.msgpack().dump() << "\n";
+//     }
+// }

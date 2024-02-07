@@ -51,8 +51,8 @@ constexpr encoded_tag_t StandardStrLenByte{0x41};
 constexpr encoded_tag_t StandardStrLenShort{0x42};
 constexpr encoded_tag_t StandardStrLenInt{0x43};
 
-constexpr encoded_tag_t SchemaNodeIdByte{0x60};
-constexpr encoded_tag_t SchemaNodeIdShort{0x61};
+constexpr encoded_tag_t SchemaNodeParentIdByte{0x60};
+constexpr encoded_tag_t SchemaNodeParentIdShort{0x61};
 
 constexpr encoded_tag_t KeyIdByte{0x65};
 constexpr encoded_tag_t KeyIdShort{0x66};

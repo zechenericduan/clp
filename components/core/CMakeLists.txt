@@ -368,6 +368,8 @@ set(SOURCE_FILES_unitTest
         src/clp_s/ffi/ir_stream/serialization_methods.cpp
         src/clp_s/ffi/ir_stream/serialization_methods.hpp
         src/clp_s/ffi/ir_stream/SerializationBuffer.hpp
+        src/clp_s/ffi/ir_stream/utils.cpp
+        src/clp_s/ffi/ir_stream/utils.hpp
         src/clp_s/ffi/SchemaTree.hpp
         src/clp_s/ffi/SchemaTreeNode.hpp
         submodules/sqlite3/sqlite3.c

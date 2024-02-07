@@ -4,6 +4,8 @@
 #include <msgpack.hpp>
 #include <vector>
 
+#include <GSL/include/gsl/span>
+
 #include "../../Utils.hpp"
 #include "../SchemaTree.hpp"
 
@@ -20,7 +22,7 @@ public:
      * Gets the IR buffer that contains the serialized CLP IR byte sequence.
      * @return The current ir buf as a span.
      */
-    [[nodiscard]] auto get_ir_buf() -> Span<char const> {
+    [[nodiscard]] auto get_ir_buf() -> gsl::span<char const> {
         // TODO: we should replace this by either gsl::span or std::span (c++20).
         return {reinterpret_cast<char const*>(m_ir_buf.data()), m_ir_buf.size()};
     }
