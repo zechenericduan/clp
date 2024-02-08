@@ -415,3 +415,8 @@ target_link_libraries(unitTest
 target_compile_features(unitTest
         PRIVATE cxx_std_17
         )
+target_compile_options(unitTest PRIVATE
+        $<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:GNU>:-g>>
+        $<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:Clang>:-g>>
+        $<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:MSVC>:/Zi>>
+        )

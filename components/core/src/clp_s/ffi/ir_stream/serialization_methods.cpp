@@ -1,10 +1,12 @@
 #include "serialization_methods.hpp"
 
+#include <iostream>
 #include <string_view>
 #include <vector>
 
 #include <GSL/include/gsl/span>
 
+#include "../../../clp/ffi/ir_stream/encoding_methods.hpp"
 #include "../../Utils.hpp"
 #include "byteswap.hpp"
 #include "protocol_constants.hpp"
@@ -34,17 +36,17 @@ public:
     /**
      * @return true if all the elements have been traversed.
      */
-    [[nodiscard]] auto end_reached() const -> bool { return m_view.empty(); }
+    [[nodiscard]] auto end_reached() const -> bool { return m_view.size() == m_idx; }
 
     /**
      * Advances the underlying iterator.
      */
-    auto advance() -> void { m_view = m_view.last(m_view.size() - 1); }
+    auto advance() -> void { ++m_idx; }
 
     /**
      * @return a const reference to the next element to be traversed.
      */
-    [[nodiscard]] auto get_element() const -> ElementType const& { return m_view.front(); }
+    [[nodiscard]] auto get_element() const -> ElementType const& { return m_view[m_idx]; }
 
     /**
      * @return the parent's schema tree node id.
@@ -53,6 +55,7 @@ public:
 
 private:
     View m_view;
+    size_t m_idx{0};
     SchemaTreeNode::id_t m_parent_id;
 };
 
@@ -72,6 +75,7 @@ private:
         case msgpack::type::NEGATIVE_INTEGER:
             type = SchemaTreeNode::Type::Int;
             break;
+        case msgpack::type::FLOAT32:
         case msgpack::type::FLOAT:
             type = SchemaTreeNode::Type::Float;
             break;
@@ -80,6 +84,7 @@ private:
             break;
         case msgpack::type::BOOLEAN:
             type = SchemaTreeNode::Type::Bool;
+            break;
         case msgpack::type::NIL:
         case msgpack::type::MAP:
             type = SchemaTreeNode::Type::Obj;
@@ -191,7 +196,8 @@ auto serialize_double(double value, vector<int8_t>& buf) -> void {
 [[nodiscard]] auto serialize_clp_str(std::string_view str, vector<int8_t>& buf) -> bool {
     // TODO: replace this by using the real CLP string encoding.
     buf.push_back(cProtocol::Tag::ValueStrCLPFourByte);
-    return serialize_str(str, buf);
+    std::string logtype;
+    return clp::ffi::ir_stream::four_byte_encoding::serialize_message(str, logtype, buf);
 }
 
 /**
@@ -364,7 +370,7 @@ serialize_value(msgpack::object const& val, SchemaTreeNode::Type type, vector<in
 }
 }  // namespace
 
-auto serialize_key_value_pair_records(
+auto serialize_key_value_pair_record(
         msgpack::object const& record,
         SerializationBuffer& serialization_buf
 ) -> bool {
@@ -398,6 +404,7 @@ auto serialize_key_value_pair_records(
         auto const& [key, val]{curr.get_element()};
         SchemaTreeNode::Type schema_tree_node_type{};
         if (false == convert_msgpack_value_to_schema_tree_node_type(val, schema_tree_node_type)) {
+            std::cerr << 1 << "\n";
             failure = true;
             break;
         }
@@ -409,15 +416,17 @@ auto serialize_key_value_pair_records(
         if (false == serialization_buf.m_schema_tree.has_node(locator, curr_id)) {
             curr_id = serialization_buf.m_schema_tree.insert_node(locator);
             if (false == serialize_new_schema_tree_node(locator, node_buf)) {
+                std::cerr << 2 << "\n";
                 failure = true;
                 break;
             }
         }
-        if (SchemaTreeNode::Type::Obj == schema_tree_node_type && msgpack::type::NIL != val.type) {
+        if (SchemaTreeNode::Type::Obj == schema_tree_node_type && msgpack::type::MAP == val.type) {
             auto const& inner_map{val.via.map};
             auto const inner_map_size{static_cast<size_t>(inner_map.size)};
             if (0 == inner_map_size) {
                 if (false == serialize_key_id(curr_id, key_buf)) {
+                    std::cerr << 3 << "\n";
                     failure = true;
                     break;
                 }
@@ -427,10 +436,12 @@ auto serialize_key_value_pair_records(
             }
         } else {
             if (false == serialize_key_id(curr_id, key_buf)) {
+                std::cerr << 4 << "\n";
                 failure = true;
                 break;
             }
             if (false == serialize_value(val, schema_tree_node_type, val_buf)) {
+                std::cerr << 5 << "\n";
                 failure = true;
                 break;
             }
@@ -449,5 +460,9 @@ auto serialize_key_value_pair_records(
     ir_buf.insert(ir_buf.cend(), val_buf.cbegin(), val_buf.cend());
 
     return true;
+}
+
+auto serialize_end_of_stream(SerializationBuffer& serialization_buf) -> void {
+    serialization_buf.m_ir_buf.push_back(cProtocol::EndOfStream);
 }
 }  // namespace clp_s::ffi::ir_stream

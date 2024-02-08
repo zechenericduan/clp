@@ -66,7 +66,7 @@ constexpr encoded_tag_t SchemaNodeArray{0x75};
 constexpr encoded_tag_t SchemaNodeObj{0x76};
 }  // namespace Tag
 
-constexpr encoded_tag_t Eof{0x0};
+constexpr encoded_tag_t EndOfStream{0x0};
 }  // namespace clp_s::ffi::ir_stream::cProtocol
 
 #endif  // FFI_IR_STREAM_PROTOCOL_CONSTANTS_HPP

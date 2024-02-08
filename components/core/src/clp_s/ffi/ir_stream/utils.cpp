@@ -2,8 +2,21 @@
 
 #include <string_view>
 
+#include <GSL/include/gsl/span>
+#include <json/single_include/nlohmann/json.hpp>
+
 namespace clp_s::ffi::ir_stream {
 namespace {
+/**
+ * Escapes a string and append it to the json string.
+ * @param str
+ * @param json_str
+ */
+auto escape_and_append_string_to_json_str(std::string_view str, std::string& json_str) -> void {
+    // TODO: implement our own function to generate escaped string.
+    json_str += nlohmann::json(str).dump();
+}
+
 /**
  * Append a msgpack object to the json str. The object can be a primitive value.
  * @param obj
@@ -27,9 +40,7 @@ namespace {
             json_str += obj.as<bool>() ? "true" : "false";
             break;
         case msgpack::type::STR:
-            json_str.push_back('\"');
-            json_str += obj.as<std::string_view>();
-            json_str.push_back('\"');
+            escape_and_append_string_to_json_str(obj.as<std::string_view>(), json_str);
             break;
         case msgpack::type::FLOAT:
             json_str += std::to_string(obj.as<double>());
@@ -51,12 +62,13 @@ namespace {
 auto append_msgpack_array_to_json_str(msgpack::object const& array, std::string& json_str) -> bool {
     json_str.push_back('[');
     auto const array_data{array.via.array};
-    auto const array_size{static_cast<size_t>(array_data.size)};
-    for (size_t idx{0}; idx < array_size; ++idx) {
-        if (0 != idx) {
+    bool is_first_element{true};
+    for (auto const& element : gsl::span{array_data.ptr, static_cast<size_t>(array_data.size)}) {
+        if (is_first_element) {
+            is_first_element = false;
+        } else {
             json_str.push_back(',');
         }
-        auto const& element{array_data.ptr[idx]};
         if (false == append_msgpack_obj_to_json_str(element, json_str)) {
             return false;
         }
@@ -68,17 +80,16 @@ auto append_msgpack_array_to_json_str(msgpack::object const& array, std::string&
 auto append_msgpack_map_to_json_str(msgpack::object const& map, std::string& json_str) -> bool {
     json_str.push_back('{');
     auto const& map_data{map.via.map};
-    auto const map_size{static_cast<size_t>(map_data.size)};
-    for (size_t idx{0}; idx < map_size; ++idx) {
-        if (0 != idx) {
+    bool is_first_element{true};
+    for (auto const& [key, val] : gsl::span{map_data.ptr, static_cast<size_t>(map_data.size)}) {
+        if (is_first_element) {
+            is_first_element = false;
+        } else {
             json_str.push_back(',');
         }
-        auto const& key_value_pair{map_data.ptr[idx]};
-        json_str.push_back('\"');
-        json_str += key_value_pair.key.as<std::string_view>();
-        json_str.push_back('\"');
+        escape_and_append_string_to_json_str(key.as<std::string_view>(), json_str);
         json_str.push_back(':');
-        if (false == append_msgpack_obj_to_json_str(key_value_pair.val, json_str)) {
+        if (false == append_msgpack_obj_to_json_str(val, json_str)) {
             return false;
         }
     }

@@ -44,8 +44,9 @@ public:
     }
 
 private:
-    friend auto serialize_key_value_pair_records(msgpack::object const&, SerializationBuffer&)
+    friend auto serialize_key_value_pair_record(msgpack::object const&, SerializationBuffer&)
             -> bool;
+    friend auto serialize_end_of_stream(SerializationBuffer&) -> void;
 
     std::vector<int8_t> m_ir_buf;
     std::vector<int8_t> m_schema_tree_node_buf;
