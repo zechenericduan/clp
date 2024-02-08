@@ -112,7 +112,7 @@ TEST_CASE("append_json_str", "[ffi][structured]") {
 
 TEST_CASE("structured_ir_encoding", "[ffi][structured]") {
     std::string const prefix{"/Users/lzh/clp_ir_old/clp/components/core/build/"};
-    std::string const file_path{prefix + "data/wmt2.json"};
+    std::string const file_path{prefix + "data/cisco.json"};
     std::string const output_path{file_path + ".msgpack.clp"};
     std::ifstream fin;
 
@@ -129,7 +129,7 @@ TEST_CASE("structured_ir_encoding", "[ffi][structured]") {
         msgpack::unpack(oh, reinterpret_cast<char const*>(data.data()), data.size());
 
         auto const start{std::chrono::high_resolution_clock::now()};
-        REQUIRE(false == serialize_key_value_pair_record(oh.get(), buffer));
+        REQUIRE(serialize_key_value_pair_record(oh.get(), buffer));
         auto const end{std::chrono::high_resolution_clock::now()};
         auto const elapsed{std::chrono::duration_cast<std::chrono::microseconds>(end - start)};
         microseconds += elapsed.count();
