@@ -39,7 +39,7 @@ public:
      * unique tree node in the tree. This class wraps the location information as a none-integer
      * unique identifier of a tree node.
      */
-    struct TreeNodeLocator {
+    class TreeNodeLocator {
     public:
         TreeNodeLocator(
                 SchemaTreeNode::id_t parent_id,
@@ -120,7 +120,7 @@ public:
      * @return The node id of the inserted node.
      * @throw Exception if the node with given location already exists.
      */
-    [[nodiscard]] auto insert_node(TreeNodeLocator const& location) -> SchemaTreeNode::id_t {
+    [[maybe_unused]] auto insert_node(TreeNodeLocator const& location) -> SchemaTreeNode::id_t {
         SchemaTreeNode::id_t node_id{};
         if (has_node(location, node_id)) {
             throw Exception(ErrorCodeFailure, __FILE__, __LINE__, "Tree Node already exists.");
