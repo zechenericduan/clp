@@ -58,6 +58,21 @@ private:
         std::vector<SchemaTreeNode::id_t>& schema,
         std::vector<std::optional<Value>>& values
 ) -> IRErrorCode;
+
+/**
+ * Deserializes the key-value pair record as a JSON string.
+ * @param schema_tree
+ * @param schema The schema of the record.
+ * @param values The values of the record.
+ * @param json_str Outputs the deserialized JSON string.
+ * @return true on success, false otherwise.
+ */
+[[nodiscard]] auto deserialize_record_as_json_str(
+        SchemaTree const& schema_tree,
+        std::vector<SchemaTreeNode::id_t> const& schema,
+        std::vector<std::optional<Value>> const& values,
+        std::string& json_str
+) -> bool;
 }  // namespace clp_s::ffi::ir_stream
 
 #endif

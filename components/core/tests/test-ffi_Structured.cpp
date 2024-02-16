@@ -6,7 +6,9 @@
 #include <Catch2/single_include/catch2/catch.hpp>
 #include <json/single_include/nlohmann/json.hpp>
 
+#include "../src/clp/FileReader.hpp"
 #include "../src/clp/FileWriter.hpp"
+#include "../src/clp_s/ffi/ir_stream/deserialization_methods.hpp"
 #include "../src/clp_s/ffi/ir_stream/serialization_methods.hpp"
 #include "../src/clp_s/ffi/ir_stream/SerializationBuffer.hpp"
 #include "../src/clp_s/ffi/ir_stream/utils.hpp"
@@ -18,6 +20,9 @@ using clp_s::ffi::ir_stream::append_msgpack_map_to_json_str;
 using clp_s::ffi::ir_stream::SerializationBuffer;
 using clp_s::ffi::ir_stream::serialize_end_of_stream;
 using clp_s::ffi::ir_stream::serialize_key_value_pair_record;
+using clp_s::ffi::ir_stream::deserialize_next_key_value_pair_record;
+using clp_s::ffi::ir_stream::deserialize_record_as_json_str;
+using clp_s::ffi::ir_stream::IRErrorCode;
 using clp_s::ffi::SchemaTree;
 using clp_s::ffi::SchemaTreeNode;
 
@@ -112,7 +117,8 @@ TEST_CASE("append_json_str", "[ffi][structured]") {
 
 TEST_CASE("structured_ir_encoding", "[ffi][structured]") {
     std::string const prefix{"/Users/lzh/clp_ir_old/clp/components/core/build/"};
-    std::string const file_path{prefix + "data/cisco.json"};
+    std::string const file_path{prefix + "data/rider-product-cored-clj.json"};
+    // std::string const file_path{prefix + "data/ref.json"};
     std::string const output_path{file_path + ".msgpack.clp"};
     std::ifstream fin;
 
@@ -129,7 +135,11 @@ TEST_CASE("structured_ir_encoding", "[ffi][structured]") {
         msgpack::unpack(oh, reinterpret_cast<char const*>(data.data()), data.size());
 
         auto const start{std::chrono::high_resolution_clock::now()};
-        REQUIRE(serialize_key_value_pair_record(oh.get(), buffer));
+        auto const ret{serialize_key_value_pair_record(oh.get(), buffer)};
+        if (false == ret) {
+            std::cerr << "Failed to serialize: " << line << "\n";
+        }
+        REQUIRE(ret);
         auto const end{std::chrono::high_resolution_clock::now()};
         auto const elapsed{std::chrono::duration_cast<std::chrono::microseconds>(end - start)};
         microseconds += elapsed.count();
@@ -145,4 +155,64 @@ TEST_CASE("structured_ir_encoding", "[ffi][structured]") {
     buffer.flush_ir_buf();
     writer.close();
     fin.close();
+}
+
+TEST_CASE("structured_ir_decoding", "[ffi][structured]") {
+    std::string const ref_path{"data/rider-product-cored-clj.json"};
+    // std::string const ref_path{"data/wmt3_clj.json"};
+    std::string const input_path{ref_path + ".msgpack.clp"};
+    clp::FileReader reader;
+    reader.open(input_path);
+    SchemaTree schema_tree;
+    std::vector<SchemaTreeNode::id_t> schema;
+    std::vector<std::optional<clp_s::ffi::ir_stream::Value>> values;
+    std::string json_str;
+
+    std::ifstream fin;
+    fin.open(ref_path);
+    nlohmann::json ref_item;
+    nlohmann::json deserialized_item;
+    std::string line;
+    size_t idx{0};
+    bool failed{false};
+    while (true) {
+        auto const err{deserialize_next_key_value_pair_record(reader, schema_tree, schema, values)};
+        if (IRErrorCode::EndOfStream == err) {
+            break;
+        }
+        REQUIRE(IRErrorCode::Success == err);
+        REQUIRE(deserialize_record_as_json_str(schema_tree, schema, values, json_str));
+        if (getline(fin, line)) {
+            ref_item = nlohmann::json::parse(line);
+        } else {
+            failed = true;
+            std::cerr << "Idx " << idx << " failed to parse.\n";
+            break;
+        }
+        // std::cerr << "Deserialized:\n";
+        // std::cerr << json_str << "\n";
+        // std::cerr << "Reference:\n";
+        // std::cerr << line << "\n";
+
+        deserialized_item = nlohmann::json::parse(json_str);
+        if (deserialized_item != ref_item) {
+            std::cerr << "Idx: " << idx << "\n";
+            std::cerr << "Ref:\n" << ref_item.dump() << "\n"; 
+            std::cerr << "Deserialized:\n" << deserialized_item.dump() << "\n"; 
+            std::cerr << "JSON str:\n" << json_str << "\n";
+            failed = true;
+            break;
+        }
+
+        ++idx;
+    }
+    REQUIRE(false == failed);
+}
+
+TEST_CASE("json_whatever", "[ffi][structured]") {
+    std::string test;
+    test += "\\nWhatever";
+    std::cerr << "Test Raw: " << test << "\n";
+    nlohmann::json json_test(test);
+    std::cerr << "Dump: " << json_test.dump() << "\n";
 }

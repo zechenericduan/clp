@@ -1,9 +1,15 @@
 #include "deserialization_methods.hpp"
 
+#include <iostream>
+#include <unordered_map>
+
+#include <json/single_include/nlohmann/json.hpp>
+
 #include "../../../clp/ErrorCode.hpp"
 #include "../../../clp/ffi/ir_stream/decoding_methods.hpp"
 #include "../../Utils.hpp"
 #include "byteswap.hpp"
+#include "ClpString.hpp"
 #include "protocol_constants.hpp"
 
 using clp::ReaderInterface;
@@ -102,6 +108,7 @@ template <typename integer_t>
         }
         str_length = static_cast<size_t>(length);
     } else {
+        std::cerr << "Unknown tag str\n";
         return IRErrorCode::UnknownTag;
     }
     if (clp::ErrorCode_Success != reader.try_read_string(str_length, str)) {
@@ -164,6 +171,7 @@ deserialize_parent_id(ReaderInterface& reader, encoded_tag_t tag, SchemaTreeNode
         }
         parent_id = static_cast<SchemaTreeNode::id_t>(deserialized_id);
     } else {
+        std::cerr << "Unknown tag parent id\n";
         return IRErrorCode::UnknownTag;
     }
     return IRErrorCode::Success;
@@ -208,7 +216,7 @@ deserialize_parent_id(ReaderInterface& reader, encoded_tag_t tag, SchemaTreeNode
     }
 
     schema_tree.insert_node(locator);
-    return IRErrorCode::DecodeError;
+    return IRErrorCode::Success;
 }
 
 /**
@@ -282,17 +290,23 @@ deserialize_and_append_float_value(ReaderInterface& reader, vector<std::optional
 
 /**
  * Deserializes a CLP string from the reader and appends it to the end of the deserialized values.
+ * @tparam encoded_variable_t
  * @param reader
  * @param values
  * @return IRErrorCode::Success on success.
  * @return related error code otherwise.
  */
+template <typename encoded_variable_t>
 [[nodiscard]] auto
 deserialize_and_append_clp_str_value(ReaderInterface& reader, vector<std::optional<Value>>& values)
         -> IRErrorCode {
-    std::string clp_str;
-    if (auto const err{
-                clp::ffi::ir_stream::four_byte_encoding::deserialize_clp_str(reader, clp_str)};
+    ClpString<encoded_variable_t> clp_str;
+    if (auto const err{clp::ffi::ir_stream::four_byte_encoding::deserialize_clp_str(
+                reader,
+                clp_str.get_logtype(),
+                clp_str.get_encoded_vars(),
+                clp_str.get_dict_vars()
+        )};
         clp::ffi::ir_stream::IRErrorCode_Success != err)
     {
         if (clp::ffi::ir_stream::IRErrorCode_Incomplete_IR == err) {
@@ -342,13 +356,17 @@ deserialize_and_append_clp_str_value(ReaderInterface& reader, vector<std::option
             break;
         case cProtocol::Tag::ValueFalse:
             values.emplace_back(false);
+            break;
         case cProtocol::Tag::StandardStrLenByte:
         case cProtocol::Tag::StandardStrLenShort:
         case cProtocol::Tag::StandardStrLenInt:
             err = deserialize_and_append_str_value(reader, tag, values);
             break;
         case cProtocol::Tag::ValueStrCLPFourByte:
-            err = deserialize_and_append_clp_str_value(reader, values);
+            err = deserialize_and_append_clp_str_value<four_byte_encoded_variable_t>(
+                    reader,
+                    values
+            );
             break;
         case cProtocol::Tag::ValueStrCLPEightByte:
             err = IRErrorCode::NotImplemented;
@@ -360,9 +378,73 @@ deserialize_and_append_clp_str_value(ReaderInterface& reader, vector<std::option
             values.emplace_back(Value{});
             break;
         default:
+            std::cerr << "Unknown tag value\n";
             err = IRErrorCode::UnknownTag;
+            break;
     }
     return err;
+}
+
+/**
+ * Checks whether the value type matches the schema tree node type.
+ * @param type
+ * @param optional_val
+ * @return true if the type matches, false otherwise.
+ */
+[[nodiscard]] auto
+check_value_type(SchemaTreeNode::Type type, std::optional<Value> const& optional_val) -> bool {
+    if (false == optional_val.has_value()) {
+        return SchemaTreeNode::Type::Obj == type;
+    }
+    auto const& val{optional_val.value()};
+    switch (type) {
+        case SchemaTreeNode::Type::Int:
+            return val.is_type<value_int_t>();
+        case SchemaTreeNode::Type::Float:
+            return val.is_type<value_float_t>();
+        case SchemaTreeNode::Type::Bool:
+            return val.is_type<value_bool_t>();
+        case SchemaTreeNode::Type::Str:
+            return val.is_type<value_str_t>() || val.is_clp_str();
+        case SchemaTreeNode::Type::Array:
+            return val.is_clp_str();
+        case SchemaTreeNode::Type::Obj:
+            return val.is_null();
+        default:
+            return false;
+    }
+}
+
+/**
+ * Appends a leaf node to the JSON string.
+ * @param node
+ * @param opt_val
+ * @param json_str Outputs the appended JSON string.
+ * @param add_leading_comma Whether to add `,` before appending the leaf node.
+ */
+auto append_leaf_node_to_json_str(
+        SchemaTreeNode const& node,
+        std::optional<Value> const& opt_val,
+        bool add_leading_comma,
+        std::string& json_str
+) -> void {
+    if (add_leading_comma) {
+        json_str.push_back(',');
+    }
+    json_str.push_back('\"');
+    json_str += node.get_key_name();
+    json_str.push_back('\"');
+    json_str.push_back(':');
+    if (false == opt_val.has_value()) {
+        json_str += "{}";
+        return;
+    }
+    auto const& val{opt_val.value()};
+    if (SchemaTreeNode::Type::Str == node.get_type()) {
+        json_str += nlohmann::json(val.dump()).dump();
+    } else {
+        json_str += val.dump();
+    }
 }
 }  // namespace
 
@@ -404,8 +486,12 @@ auto deserialize_next_key_value_pair_record(
             if (false == deserialize_int(reader, id)) {
                 return IRErrorCode::IncompleteStream;
             }
+            schema.push_back(static_cast<SchemaTreeNode::id_t>(id));
         } else {
             break;
+        }
+        if (auto const err{read_next_tag(reader, tag)}; IRErrorCode::Success != err) {
+            return err;
         }
     }
 
@@ -419,11 +505,20 @@ auto deserialize_next_key_value_pair_record(
     }
 
     // Deserialize values
+    size_t idx{0};
     while (true) {
         if (auto const err{deserialize_and_append_value(reader, tag, values)};
             IRErrorCode::Success != err)
         {
             return err;
+        }
+        if (false
+            == check_value_type(
+                    schema_tree.get_node_with_id(schema[idx]).get_type(),
+                    values.back()
+            ))
+        {
+            return IRErrorCode::CorruptedStream;
         }
         if (values.size() == num_leaves) {
             break;
@@ -431,8 +526,88 @@ auto deserialize_next_key_value_pair_record(
         if (auto const err{read_next_tag(reader, tag)}; IRErrorCode::Success != err) {
             return err;
         }
+        ++idx;
     }
 
     return IRErrorCode::Success;
+}
+
+[[nodiscard]] auto deserialize_record_as_json_str(
+        SchemaTree const& schema_tree,
+        std::vector<SchemaTreeNode::id_t> const& schema,
+        std::vector<std::optional<Value>> const& values,
+        std::string& json_str
+) -> bool {
+    struct StackNode {
+        StackNode(SchemaTreeNode const& node)
+                : node_ref{node},
+                  num_children{node.get_children_ids().size()} {};
+        SchemaTreeNode const& node_ref;
+        size_t num_children;
+        size_t child_idx{0};
+        size_t num_serialized_child{0};
+    };
+
+    json_str.clear();
+    if (schema.size() != values.size()) {
+        return false;
+    }
+    if (values.empty()) {
+        json_str = "{}";
+        return true;
+    }
+
+    auto node_to_traverse{std::vector<bool>(schema_tree.get_size(), false)};
+    std::unordered_map<SchemaTreeNode::id_t, size_t> id_to_value_map;
+    size_t idx{0};
+
+    for (auto id : schema) {
+        id_to_value_map.emplace(id, idx);
+        ++idx;
+        auto id_to_process{id};
+        while (SchemaTree::cRootId != id_to_process && false == node_to_traverse[id_to_process]) {
+            node_to_traverse[id_to_process] = true;
+            id_to_process = schema_tree.get_node_with_id(id_to_process).get_parent_id();
+        }
+    }
+
+    vector<StackNode> working_stack;
+    working_stack.emplace_back(schema_tree.get_node_with_id(SchemaTree::cRootId));
+    json_str.push_back('{');
+    while (false == working_stack.empty()) {
+        auto& top{working_stack.back()};
+        if (top.num_children == top.child_idx) {
+            json_str.push_back('}');
+            working_stack.pop_back();
+            continue;
+        }
+        auto const child_id{top.node_ref.get_children_ids()[top.child_idx]};
+        ++top.child_idx;
+        if (false == node_to_traverse[child_id]) {
+            continue;
+        }
+        auto const add_comma{0 != top.num_serialized_child};
+        ++top.num_serialized_child;
+        auto const id_to_value{id_to_value_map.find(child_id)};
+        auto const& child{schema_tree.get_node_with_id(child_id)};
+        if (id_to_value_map.cend() != id_to_value) {
+            // Leaf node reached
+            auto const value_idx{id_to_value->second};
+            append_leaf_node_to_json_str(child, values[value_idx], add_comma, json_str);
+            continue;
+        }
+
+        if (add_comma) {
+            json_str.push_back(',');
+        }
+        json_str.push_back('\"');
+        json_str += child.get_key_name();
+        json_str.push_back('\"');
+        json_str.push_back(':');
+        json_str.push_back('{');
+        working_stack.emplace_back(child);
+    }
+
+    return true;
 }
 }  // namespace clp_s::ffi::ir_stream

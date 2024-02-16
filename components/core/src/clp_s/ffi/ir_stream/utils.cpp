@@ -42,8 +42,9 @@ auto escape_and_append_string_to_json_str(std::string_view str, std::string& jso
         case msgpack::type::STR:
             escape_and_append_string_to_json_str(obj.as<std::string_view>(), json_str);
             break;
+        case msgpack::type::FLOAT32:
         case msgpack::type::FLOAT:
-            json_str += std::to_string(obj.as<double>());
+            json_str += nlohmann::json(obj.as<double>()).dump();
             break;
         case msgpack::type::POSITIVE_INTEGER:
             json_str += std::to_string(obj.as<uint64_t>());

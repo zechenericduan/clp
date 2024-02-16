@@ -1,5 +1,6 @@
 #include "serialization_methods.hpp"
 
+#include <iostream>
 #include <string_view>
 #include <vector>
 
@@ -403,6 +404,7 @@ auto serialize_key_value_pair_record(
         auto const& [key, val]{curr.get_element()};
         SchemaTreeNode::Type schema_tree_node_type{};
         if (false == convert_msgpack_value_to_schema_tree_node_type(val, schema_tree_node_type)) {
+            std::cerr << "1\n";
             failure = true;
             break;
         }
@@ -414,6 +416,7 @@ auto serialize_key_value_pair_record(
         if (false == serialization_buf.m_schema_tree.has_node(locator, curr_id)) {
             curr_id = serialization_buf.m_schema_tree.insert_node(locator);
             if (false == serialize_new_schema_tree_node(locator, node_buf)) {
+                std::cerr << "2\n";
                 failure = true;
                 break;
             }
@@ -423,6 +426,7 @@ auto serialize_key_value_pair_record(
             auto const inner_map_size{static_cast<size_t>(inner_map.size)};
             if (0 == inner_map_size) {
                 if (false == serialize_key_id(curr_id, key_buf)) {
+                    std::cerr << "3\n";
                     failure = true;
                     break;
                 }
@@ -432,10 +436,12 @@ auto serialize_key_value_pair_record(
             }
         } else {
             if (false == serialize_key_id(curr_id, key_buf)) {
+                std::cerr << "4\n";
                 failure = true;
                 break;
             }
             if (false == serialize_value(val, schema_tree_node_type, val_buf)) {
+                std::cerr << "5\n";
                 failure = true;
                 break;
             }
