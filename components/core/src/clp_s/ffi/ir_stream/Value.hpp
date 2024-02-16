@@ -174,17 +174,11 @@ public:
 
     /**
      * Moving constructs a clp string (four byte encoding).
+     * @tparam encoded_variable_t
      * @param clp_str
      */
     template <typename encoded_variable_t>
-    Value(value_four_byte_clp_str_t&& clp_str) : m_value{std::move(clp_str)} {};
-
-    /**
-     * Moving constructs a clp string (eight byte encoding).
-     * @param clp_str
-     */
-    template <typename encoded_variable_t>
-    Value(value_eight_byte_clp_str_t&& clp_str) : m_value{std::move(clp_str)} {};
+    Value(ClpString<encoded_variable_t>&& clp_str) : m_value{std::move(clp_str)} {};
 
     /**
      * @return if the underlying value is null.
