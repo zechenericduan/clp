@@ -171,6 +171,21 @@ public:
         m_tree_nodes.emplace_back(cRootId, cRootId, "", SchemaTreeNode::Type::Obj);
     }
 
+    auto dump() -> std::string {
+        size_t idx{0};
+        std::string result;
+        for (auto const& node : m_tree_nodes) {
+            result += std::to_string(idx);
+            result += "|";
+            result += std::to_string(node.get_parent_id());
+            result += " ";
+            result += node.get_key_name();
+            result += "\n";
+            ++idx;
+        }
+        return result;
+    }
+
 private:
     size_t m_snapshot_size{0};
     std::vector<SchemaTreeNode> m_tree_nodes;

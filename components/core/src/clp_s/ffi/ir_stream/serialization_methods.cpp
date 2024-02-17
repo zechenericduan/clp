@@ -401,6 +401,7 @@ auto serialize_key_value_pair_record(
             continue;
         }
         auto const& [key, val]{curr.get_element()};
+        curr.advance();
         SchemaTreeNode::Type schema_tree_node_type{};
         if (false == convert_msgpack_value_to_schema_tree_node_type(val, schema_tree_node_type)) {
             std::cerr << "1\n";
@@ -445,7 +446,6 @@ auto serialize_key_value_pair_record(
                 break;
             }
         }
-        curr.advance();
     }
 
     if (failure) {
