@@ -27,6 +27,10 @@ public:
         return {reinterpret_cast<char const*>(m_ir_buf.data()), m_ir_buf.size()};
     }
 
+    [[nodiscard]] auto get_schema_tree() const -> SchemaTree const& {
+        return m_schema_tree;
+    }
+
     /**
      * Flush the current IR buffer.
      */

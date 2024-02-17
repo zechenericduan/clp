@@ -215,6 +215,30 @@ bool serialize_log_event(
 
     return true;
 }
+
+bool serialize_message(std::string_view message, std::string& logtype, std::vector<int8_t>& ir_buf) {
+    auto encoded_var_handler = [&ir_buf](eight_byte_encoded_variable_t encoded_var) {
+        ir_buf.push_back(cProtocol::Payload::VarEightByteEncoding);
+        serialize_int(encoded_var, ir_buf);
+    };
+
+    if (false
+        == encode_message_generically<eight_byte_encoded_variable_t>(
+                message,
+                logtype,
+                ir::escape_and_append_const_to_logtype,
+                encoded_var_handler,
+                DictionaryVariableHandler(ir_buf)
+        ))
+    {
+        return false;
+    }
+
+    if (false == serialize_logtype(logtype, ir_buf)) {
+        return false;
+    }
+    return true;
+}
 }  // namespace eight_byte_encoding
 
 namespace four_byte_encoding {

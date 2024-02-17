@@ -38,6 +38,8 @@ bool serialize_log_event(
         std::string& logtype,
         std::vector<int8_t>& ir_buf
 );
+
+bool serialize_message(std::string_view message, std::string& logtype, std::vector<int8_t>& ir_buf);
 }  // namespace eight_byte_encoding
 
 namespace four_byte_encoding {

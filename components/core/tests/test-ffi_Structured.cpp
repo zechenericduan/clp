@@ -117,8 +117,8 @@ TEST_CASE("append_json_str", "[ffi][structured]") {
 
 TEST_CASE("structured_ir_encoding", "[ffi][structured]") {
     std::string const prefix{"/Users/lzh/clp_ir_old/clp/components/core/build/"};
-    std::string const file_path{prefix + "data/rider-product-cored-clj.json"};
-    // std::string const file_path{prefix + "data/ref.json"};
+    // std::string const file_path{prefix + "data/rider-product-cored-clj.json"};
+    std::string const file_path{prefix + "data/wmt2.json"};
     std::string const output_path{file_path + ".msgpack.clp"};
     std::ifstream fin;
 
@@ -158,8 +158,8 @@ TEST_CASE("structured_ir_encoding", "[ffi][structured]") {
 }
 
 TEST_CASE("structured_ir_decoding", "[ffi][structured]") {
-    std::string const ref_path{"data/rider-product-cored-clj.json"};
-    // std::string const ref_path{"data/wmt3_clj.json"};
+    // std::string const ref_path{"data/rider-product-cored-clj.json"};
+    std::string const ref_path{"data/spark-event-logs.json"};
     std::string const input_path{ref_path + ".msgpack.clp"};
     clp::FileReader reader;
     reader.open(input_path);

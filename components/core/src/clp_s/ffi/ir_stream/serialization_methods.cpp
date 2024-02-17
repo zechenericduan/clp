@@ -19,7 +19,7 @@ namespace {
 /**
  * This tag determines whether integers will be serialized using bytes and shorts.
  */
-static constexpr bool cEnableShortIntCompression{false};
+static constexpr bool cEnableShortIntCompression{true};
 
 /**
  * This class defines a stack node used to traverse a msgpack MAP.
@@ -194,7 +194,6 @@ auto serialize_double(double value, vector<int8_t>& buf) -> void {
  * @return true on success, false on failure.
  */
 [[nodiscard]] auto serialize_clp_str(std::string_view str, vector<int8_t>& buf) -> bool {
-    // TODO: replace this by using the real CLP string encoding.
     buf.push_back(cProtocol::Tag::ValueStrCLPFourByte);
     std::string logtype;
     return clp::ffi::ir_stream::four_byte_encoding::serialize_message(str, logtype, buf);
