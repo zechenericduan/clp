@@ -2,7 +2,7 @@
 
 #include <string_view>
 
-#include <GSL/include/gsl/span>
+#include <span>
 #include <json/single_include/nlohmann/json.hpp>
 
 namespace clp_s::ffi::ir_stream {
@@ -64,7 +64,7 @@ auto append_msgpack_array_to_json_str(msgpack::object const& array, std::string&
     json_str.push_back('[');
     auto const array_data{array.via.array};
     bool is_first_element{true};
-    for (auto const& element : gsl::span{array_data.ptr, static_cast<size_t>(array_data.size)}) {
+    for (auto const& element : std::span{array_data.ptr, static_cast<size_t>(array_data.size)}) {
         if (is_first_element) {
             is_first_element = false;
         } else {
@@ -82,7 +82,7 @@ auto append_msgpack_map_to_json_str(msgpack::object const& map, std::string& jso
     json_str.push_back('{');
     auto const& map_data{map.via.map};
     bool is_first_element{true};
-    for (auto const& [key, val] : gsl::span{map_data.ptr, static_cast<size_t>(map_data.size)}) {
+    for (auto const& [key, val] : std::span{map_data.ptr, static_cast<size_t>(map_data.size)}) {
         if (is_first_element) {
             is_first_element = false;
         } else {

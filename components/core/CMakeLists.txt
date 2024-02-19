@@ -418,7 +418,7 @@ target_link_libraries(unitTest
         ZStd::ZStd
         )
 target_compile_features(unitTest
-        PRIVATE cxx_std_17
+        PRIVATE cxx_std_20
         )
 target_compile_options(unitTest PRIVATE
         $<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:GNU>:-g>>

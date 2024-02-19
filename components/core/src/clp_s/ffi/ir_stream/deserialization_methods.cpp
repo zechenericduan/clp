@@ -301,14 +301,23 @@ template <typename encoded_variable_t>
 deserialize_and_append_clp_str_value(ReaderInterface& reader, vector<std::optional<Value>>& values)
         -> IRErrorCode {
     ClpString<encoded_variable_t> clp_str;
-    if (auto const err{clp::ffi::ir_stream::four_byte_encoding::deserialize_clp_str(
+    clp::ffi::ir_stream::IRErrorCode err{};
+    if constexpr (std::is_same_v<encoded_variable_t, four_byte_encoded_variable_t>) {
+        err = clp::ffi::ir_stream::four_byte_encoding::deserialize_clp_str(
                 reader,
                 clp_str.get_logtype(),
                 clp_str.get_encoded_vars(),
                 clp_str.get_dict_vars()
-        )};
-        clp::ffi::ir_stream::IRErrorCode_Success != err)
-    {
+        );
+    } else {
+        err = clp::ffi::ir_stream::eight_byte_encoding::deserialize_clp_str(
+                reader,
+                clp_str.get_logtype(),
+                clp_str.get_encoded_vars(),
+                clp_str.get_dict_vars()
+        );
+    }
+    if (clp::ffi::ir_stream::IRErrorCode_Success != err) {
         if (clp::ffi::ir_stream::IRErrorCode_Incomplete_IR == err) {
             return IRErrorCode::IncompleteStream;
         }
@@ -369,7 +378,10 @@ deserialize_and_append_clp_str_value(ReaderInterface& reader, vector<std::option
             );
             break;
         case cProtocol::Tag::ValueStrCLPEightByte:
-            err = IRErrorCode::NotImplemented;
+            err = deserialize_and_append_clp_str_value<eight_byte_encoded_variable_t>(
+                    reader,
+                    values
+            );
             break;
         case cProtocol::Tag::ValueEmpty:
             values.emplace_back(std::nullopt);

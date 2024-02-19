@@ -62,7 +62,7 @@ auto main(int argc, char const* argv[]) -> int {
     long long ir_deserialize_time{0};
 
     std::ifstream fin;
-    fin.open(input_path);
+    fin.open(std::string(input_path));
     SerializationBuffer buffer;
     std::string line;
     std::vector<SchemaTreeNode::id_t> schema;

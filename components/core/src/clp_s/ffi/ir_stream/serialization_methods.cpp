@@ -4,7 +4,7 @@
 #include <string_view>
 #include <vector>
 
-#include <GSL/include/gsl/span>
+#include <span>
 
 #include "../../../clp/ffi/ir_stream/encoding_methods.hpp"
 #include "../../Utils.hpp"
@@ -19,7 +19,8 @@ namespace {
 /**
  * This tag determines whether integers will be serialized using bytes and shorts.
  */
-static constexpr bool cEnableShortIntCompression{true};
+static constexpr bool cEnableShortIntCompression{false};
+static constexpr bool cEnable32IntCompression{false};
 
 /**
  * This class defines a stack node used to traverse a msgpack MAP.
@@ -27,7 +28,7 @@ static constexpr bool cEnableShortIntCompression{true};
 template <typename ElementType>
 class SerializationStackNode {
 public:
-    using View = gsl::span<ElementType>;
+    using View = std::span<ElementType>;
 
     SerializationStackNode(ElementType* ptr, size_t size, SchemaTreeNode::id_t parent_id)
             : m_view{ptr, size},
@@ -138,7 +139,7 @@ auto serialize_integer_generic(integer_t value, vector<int8_t>& buf) -> void {
     } else if (cEnableShortIntCompression && INT16_MIN <= value && value <= INT16_MAX) {
         buf.push_back(cProtocol::Tag::ValueInt16);
         serialize_integer_generic(static_cast<int16_t>(value), buf);
-    } else if (INT32_MIN <= value && value <= INT32_MAX) {
+    } else if (cEnable32IntCompression && INT32_MIN <= value && value <= INT32_MAX) {
         buf.push_back(cProtocol::Tag::ValueInt32);
         serialize_integer_generic(static_cast<int32_t>(value), buf);
     } else if (INT64_MIN <= value && value <= INT64_MAX) {
@@ -194,9 +195,16 @@ auto serialize_double(double value, vector<int8_t>& buf) -> void {
  * @return true on success, false on failure.
  */
 [[nodiscard]] auto serialize_clp_str(std::string_view str, vector<int8_t>& buf) -> bool {
-    buf.push_back(cProtocol::Tag::ValueStrCLPFourByte);
-    std::string logtype;
-    return clp::ffi::ir_stream::four_byte_encoding::serialize_message(str, logtype, buf);
+    constexpr bool cUseFourByteEncoding{false};
+    if constexpr (cUseFourByteEncoding) {
+        buf.push_back(cProtocol::Tag::ValueStrCLPFourByte);
+        std::string logtype;
+        return clp::ffi::ir_stream::four_byte_encoding::serialize_message(str, logtype, buf);
+    } else {
+        buf.push_back(cProtocol::Tag::ValueStrCLPEightByte);
+        std::string logtype;
+        return clp::ffi::ir_stream::eight_byte_encoding::serialize_message(str, logtype, buf);
+    }
 }
 
 /**
