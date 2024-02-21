@@ -10,6 +10,9 @@
 #include "../ffi/ir_stream/deserialization_methods.hpp"
 #include "../ffi/ir_stream/serialization_methods.hpp"
 #include "../ffi/ir_stream/SerializationBuffer.hpp"
+#include "../../clp/FileWriter.hpp"
+#include "../../clp/streaming_compression/zstd/Compressor.hpp"
+#include "../clp/ffi/ir_stream/encoding_methods.hpp"
 
 using clp_s::ffi::ir_stream::deserialize_next_key_value_pair_record;
 using clp_s::ffi::ir_stream::deserialize_record_as_json_str;
@@ -46,12 +49,7 @@ size_t level_map[]{
         10L * 1024 * 1024 * 1024};
 }  // namespace
 
-auto main(int argc, char const* argv[]) -> int {
-    if (1 >= argc) {
-        std::cerr << "Error: Incorrect Args.\n";
-    }
-    std::string_view input_path{argv[1]};
-
+auto benchmark(std::string_view input_path) -> int {
     size_t level{0};
     size_t raw_json_bytes{0};
     size_t msgpack_bytes{0};
@@ -60,6 +58,8 @@ auto main(int argc, char const* argv[]) -> int {
     long long msgpack_to_map_time{0};
     long long map_to_ir_time{0};
     long long ir_deserialize_time{0};
+    long long map_to_msgpack_time{0};
+    long long clp_ir_time{0};
 
     std::ifstream fin;
     fin.open(std::string(input_path));
@@ -70,6 +70,8 @@ auto main(int argc, char const* argv[]) -> int {
     SchemaTree deserialized_schema_tree;
     size_t idx{0};
     std::optional<size_t> last_reported_level{std::nullopt};
+    std::vector<int8_t> clp_ir_buf;
+    std::string logtype;
 
     auto result_printer = [&]() -> void {
         nlohmann::json result;
@@ -77,18 +79,21 @@ auto main(int argc, char const* argv[]) -> int {
         result.emplace("level", level + 1);
         result.emplace("num_lines", idx);
         result.emplace("size_json", raw_json_bytes);
-        result.emplace("size_msgpack", msgpack_bytes);
-        result.emplace("size_ir", ir_bytes);
-        result.emplace(
-                "time_json_to_msgpack",
-                static_cast<double>(json_to_msgpack_time) / 1000000.0
-        );
-        result.emplace("time_msgpack_to_map", static_cast<double>(msgpack_to_map_time) / 1000000.0);
+        // result.emplace("size_msgpack", msgpack_bytes);
+        // result.emplace("size_ir", ir_bytes);
+        // result.emplace(
+        //         "time_json_to_msgpack",
+        //         static_cast<double>(json_to_msgpack_time) / 1000000.0
+        // );
+        // result.emplace("time_msgpack_to_map", static_cast<double>(msgpack_to_map_time) / 1000000.0);
         result.emplace("time_map_to_ir", static_cast<double>(map_to_ir_time) / 1000000.0);
-        result.emplace(
-                "time_ir_deserialization",
-                static_cast<double>(ir_deserialize_time) / 1000000.0
-        );
+        // result.emplace(
+        //         "time_ir_deserialization",
+        //         static_cast<double>(ir_deserialize_time) / 1000000.0
+        // );
+        // result.emplace("time_map_to_msgpack", static_cast<double>(map_to_msgpack_time) / 1000000.0);
+        result.emplace("time_clp_ir", static_cast<double>(clp_ir_time) / 1000000.0);
+        result.emplace("schema_tree_size", buffer.get_schema_tree().get_size());
         std::cerr << result.dump() << "\n";
         last_reported_level = level;
     };
@@ -101,6 +106,14 @@ auto main(int argc, char const* argv[]) -> int {
         auto const msgpack_data{nlohmann::json::to_msgpack(item)};
         json_to_msgpack_time += json_to_msgpack_timer.get_time_used_in_microsecond();
 
+        Timer clp_ir_timer;
+        if (false ==clp::ffi::ir_stream::four_byte_encoding::serialize_message(line, logtype, clp_ir_buf)) {
+            std::cerr << "Failed to encode CLP message with idx " << idx << "\n";
+            break; 
+        }
+        clp_ir_time += clp_ir_timer.get_time_used_in_microsecond();
+        clp_ir_buf.clear();
+
         msgpack_bytes += msgpack_data.size();
         Timer msgpack_to_map_timer;
         msgpack::object_handle oh;
@@ -110,6 +123,11 @@ auto main(int argc, char const* argv[]) -> int {
                 msgpack_data.size()
         );
         msgpack_to_map_time += msgpack_to_map_timer.get_time_used_in_microsecond();
+
+        Timer map_to_msgpack_timer;
+        msgpack::sbuffer sbuf;  // Simple buffer
+        msgpack::pack(sbuf, oh.get());
+        map_to_msgpack_time += map_to_msgpack_timer.get_time_used_in_microsecond();
 
         Timer map_to_ir_timer;
         if (false == serialize_key_value_pair_record(oh.get(), buffer)) {
@@ -150,5 +168,126 @@ auto main(int argc, char const* argv[]) -> int {
     if (buffer.get_schema_tree().get_size() != deserialized_schema_tree.get_size()) {
         std::cerr << "The deserialized tree's size doesn't match.\n";
     }
+    return 0;
+}
+
+auto compress(std::string_view input_path_view, size_t level) -> int {
+    std::ifstream fin;
+    std::string input_path{input_path_view};
+    fin.open(std::string(input_path));
+    SerializationBuffer buffer;
+    std::string line;
+    std::vector<SchemaTreeNode::id_t> schema;
+    std::vector<std::optional<clp_s::ffi::ir_stream::Value>> values;
+    SchemaTree deserialized_schema_tree;
+    size_t idx{0};
+    size_t raw_json_bytes{0};
+
+    clp::FileWriter writer;
+    writer.open(
+            input_path + std::to_string(level) + ".clp.zst",
+            clp::FileWriter::OpenMode::CREATE_FOR_WRITING
+    );
+    clp::streaming_compression::zstd::Compressor zstd_compressor;
+    zstd_compressor.open(writer);
+
+    while (getline(fin, line)) {
+        ++idx;
+        raw_json_bytes += (line.size() + 1);  // New line character
+        nlohmann::json item = nlohmann::json::parse(line);
+        auto const msgpack_data{nlohmann::json::to_msgpack(item)};
+        msgpack::object_handle oh;
+        msgpack::unpack(
+                oh,
+                reinterpret_cast<char const*>(msgpack_data.data()),
+                msgpack_data.size()
+        );
+
+        if (false == serialize_key_value_pair_record(oh.get(), buffer)) {
+            std::cerr << "Failed to serialize: (#" << idx << ")" << line << "\n";
+            return -1;
+        }
+        auto const ir_buf{buffer.get_ir_buf()};
+        zstd_compressor.write(ir_buf.data(), ir_buf.size());
+        buffer.flush_ir_buf();
+
+        if (raw_json_bytes > level_map[level]) {
+            break;
+        }
+    }
+
+    zstd_compressor.close();
+    writer.close();
+    return 0;
+}
+
+auto compress_raw(std::string_view input_path_view, size_t level) -> int {
+    std::ifstream fin;
+    std::string input_path{input_path_view};
+    fin.open(std::string(input_path));
+    SerializationBuffer buffer;
+    std::string line;
+    std::vector<SchemaTreeNode::id_t> schema;
+    std::vector<std::optional<clp_s::ffi::ir_stream::Value>> values;
+    SchemaTree deserialized_schema_tree;
+    size_t idx{0};
+    size_t raw_json_bytes{0};
+
+    clp::FileWriter writer_json;
+    writer_json.open(
+            input_path + std::to_string(level) + ".zst",
+            clp::FileWriter::OpenMode::CREATE_FOR_WRITING
+    );
+    clp::streaming_compression::zstd::Compressor zstd_compressor_json;
+    zstd_compressor_json.open(writer_json);
+
+    clp::FileWriter writer_msgpack;
+    writer_msgpack.open(
+            input_path + std::to_string(level) + ".msgpack.zst",
+            clp::FileWriter::OpenMode::CREATE_FOR_WRITING
+    );
+    clp::streaming_compression::zstd::Compressor zstd_compressor_msgpack;
+    zstd_compressor_msgpack.open(writer_msgpack);
+
+    while (getline(fin, line)) {
+        ++idx;
+        raw_json_bytes += (line.size() + 1);  // New line character
+        nlohmann::json item = nlohmann::json::parse(line);
+        auto const msgpack_data{nlohmann::json::to_msgpack(item)};
+        line += "\n";
+        zstd_compressor_json.write(line.data(), line.size());
+        zstd_compressor_msgpack.write(
+                reinterpret_cast<char const*>(msgpack_data.data()),
+                msgpack_data.size()
+        );
+
+        if (raw_json_bytes > level_map[level]) {
+            break;
+        }
+    }
+
+    zstd_compressor_json.close();
+    zstd_compressor_msgpack.close();
+    writer_json.close();
+    writer_msgpack.close();
+
+    return 0;
+}
+
+auto main(int argc, char const* argv[]) -> int {
+    if (1 >= argc) {
+        std::cerr << "Error: Incorrect Args.\n";
+    }
+    std::string_view input_path{argv[1]};
+    return benchmark(input_path);
+    // int ret{};
+    // ret = compress_raw(input_path, 3);
+    // if (0 != ret) {
+    //     return ret;
+    // }
+    // ret = compress_raw(input_path, 4);
+    // if (0 != ret) {
+    //     return ret;
+    // }
     return 0;
 }
