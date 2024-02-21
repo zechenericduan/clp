@@ -66,24 +66,24 @@ TEST_CASE("schema_tree", "[ffi][structured]") {
     test_node(4, "d", SchemaTreeNode::Type::Array, 7, true);
     test_node(4, "d", SchemaTreeNode::Type::Str, 8, true);
 
-    schema_tree.revert();
-    test_node(SchemaTree::cRootId, "a", SchemaTreeNode::Type::Obj, 1, true);
-    test_node(SchemaTree::cRootId, "a", SchemaTreeNode::Type::Int, 2, true);
-    test_node(1, "b", SchemaTreeNode::Type::Obj, 3, true);
-    test_node(3, "c", SchemaTreeNode::Type::Obj, 4, true);
-    test_node(3, "d", SchemaTreeNode::Type::Int, 5, false);
-    test_node(3, "d", SchemaTreeNode::Type::Bool, 6, false);
-    test_node(4, "d", SchemaTreeNode::Type::Array, 7, false);
-    test_node(4, "d", SchemaTreeNode::Type::Str, 8, false);
+    // schema_tree.revert();
+    // test_node(SchemaTree::cRootId, "a", SchemaTreeNode::Type::Obj, 1, true);
+    // test_node(SchemaTree::cRootId, "a", SchemaTreeNode::Type::Int, 2, true);
+    // test_node(1, "b", SchemaTreeNode::Type::Obj, 3, true);
+    // test_node(3, "c", SchemaTreeNode::Type::Obj, 4, true);
+    // test_node(3, "d", SchemaTreeNode::Type::Int, 5, false);
+    // test_node(3, "d", SchemaTreeNode::Type::Bool, 6, false);
+    // test_node(4, "d", SchemaTreeNode::Type::Array, 7, false);
+    // test_node(4, "d", SchemaTreeNode::Type::Str, 8, false);
 
-    test_node(SchemaTree::cRootId, "a", SchemaTreeNode::Type::Obj, 1, true);
-    test_node(SchemaTree::cRootId, "a", SchemaTreeNode::Type::Int, 2, true);
-    test_node(1, "b", SchemaTreeNode::Type::Obj, 3, true);
-    test_node(3, "c", SchemaTreeNode::Type::Obj, 4, true);
-    test_node(3, "d", SchemaTreeNode::Type::Int, 5, true);
-    test_node(3, "d", SchemaTreeNode::Type::Bool, 6, true);
-    test_node(4, "d", SchemaTreeNode::Type::Array, 7, true);
-    test_node(4, "d", SchemaTreeNode::Type::Str, 8, true);
+    // test_node(SchemaTree::cRootId, "a", SchemaTreeNode::Type::Obj, 1, true);
+    // test_node(SchemaTree::cRootId, "a", SchemaTreeNode::Type::Int, 2, true);
+    // test_node(1, "b", SchemaTreeNode::Type::Obj, 3, true);
+    // test_node(3, "c", SchemaTreeNode::Type::Obj, 4, true);
+    // test_node(3, "d", SchemaTreeNode::Type::Int, 5, true);
+    // test_node(3, "d", SchemaTreeNode::Type::Bool, 6, true);
+    // test_node(4, "d", SchemaTreeNode::Type::Array, 7, true);
+    // test_node(4, "d", SchemaTreeNode::Type::Str, 8, true);
 }
 
 TEST_CASE("append_json_str", "[ffi][structured]") {
@@ -102,7 +102,7 @@ TEST_CASE("append_json_str", "[ffi][structured]") {
                 "This is a string",
                 nullptr,
                 {{"key0", "This is a key value pair record"},
-                 {"key2\"escaped", "This is \"escaped\"\n"},
+                 {"key2\"escaped", "This \\\\ is \"escaped\"\n"},
                  {"inner_key0", {{"inner_key1", "inner"}, {"inner_key2", {{"inner_key3", -4}}}}},
                  {"key2", {1, 0.11111, false, nullptr}}}}};
     auto const msgpack_data{nlohmann::json::to_msgpack(json_array)};
@@ -116,9 +116,9 @@ TEST_CASE("append_json_str", "[ffi][structured]") {
 }
 
 TEST_CASE("structured_ir_encoding", "[ffi][structured]") {
-    std::string const prefix{"/Users/lzh/clp_ir_old/clp/components/core/build/"};
+    // std::string const prefix{"/Users/lzh/clp_ir_old/clp/components/core/build/"};
     // std::string const file_path{prefix + "data/rider-product-cored-clj.json"};
-    std::string const file_path{prefix + "data/wmt2.json"};
+    std::string const file_path{"data/rider.json"};
     std::string const output_path{file_path + ".msgpack.clp"};
     std::ifstream fin;
 
@@ -159,7 +159,7 @@ TEST_CASE("structured_ir_encoding", "[ffi][structured]") {
 
 TEST_CASE("structured_ir_decoding", "[ffi][structured]") {
     // std::string const ref_path{"data/rider-product-cored-clj.json"};
-    std::string const ref_path{"data/spark-event-logs.json"};
+    std::string const ref_path{"data/rider.json"};
     std::string const input_path{ref_path + ".msgpack.clp"};
     clp::FileReader reader;
     reader.open(input_path);

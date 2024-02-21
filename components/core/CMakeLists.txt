@@ -405,6 +405,7 @@ target_include_directories(unitTest
         )
 target_link_libraries(unitTest
         PRIVATE
+        absl::flat_hash_map
         Boost::filesystem Boost::iostreams Boost::program_options
         fmt::fmt
         log_surgeon::log_surgeon
@@ -615,6 +616,7 @@ target_include_directories(eva
         )
 target_link_libraries(eva
         PRIVATE
+        absl::flat_hash_map
         Boost::filesystem Boost::iostreams Boost::program_options
         fmt::fmt
         log_surgeon::log_surgeon

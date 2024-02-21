@@ -2,9 +2,8 @@
 #define CLP_S_FFI_IR_STREAM_SERIALIZATION_BUFFER
 
 #include <msgpack.hpp>
-#include <vector>
-
 #include <span>
+#include <vector>
 
 #include "../../Utils.hpp"
 #include "../SchemaTree.hpp"
@@ -27,9 +26,7 @@ public:
         return {reinterpret_cast<char const*>(m_ir_buf.data()), m_ir_buf.size()};
     }
 
-    [[nodiscard]] auto get_schema_tree() const -> SchemaTree const& {
-        return m_schema_tree;
-    }
+    [[nodiscard]] auto get_schema_tree() const -> SchemaTree const& { return m_schema_tree; }
 
     /**
      * Flush the current IR buffer.

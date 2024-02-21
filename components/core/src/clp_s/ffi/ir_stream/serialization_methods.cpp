@@ -1,10 +1,9 @@
 #include "serialization_methods.hpp"
 
 #include <iostream>
+#include <span>
 #include <string_view>
 #include <vector>
-
-#include <span>
 
 #include "../../../clp/ffi/ir_stream/encoding_methods.hpp"
 #include "../../Utils.hpp"
@@ -20,7 +19,7 @@ namespace {
  * This tag determines whether integers will be serialized using bytes and shorts.
  */
 static constexpr bool cEnableShortIntCompression{false};
-static constexpr bool cEnable32IntCompression{false};
+static constexpr bool cEnable32IntCompression{true};
 
 /**
  * This class defines a stack node used to traverse a msgpack MAP.
@@ -195,7 +194,7 @@ auto serialize_double(double value, vector<int8_t>& buf) -> void {
  * @return true on success, false on failure.
  */
 [[nodiscard]] auto serialize_clp_str(std::string_view str, vector<int8_t>& buf) -> bool {
-    constexpr bool cUseFourByteEncoding{false};
+    constexpr bool cUseFourByteEncoding{true};
     if constexpr (cUseFourByteEncoding) {
         buf.push_back(cProtocol::Tag::ValueStrCLPFourByte);
         std::string logtype;
@@ -291,6 +290,7 @@ serialize_new_schema_tree_node(SchemaTree::TreeNodeLocator const& locator, vecto
         return false;
     }
     return serialize_clp_str(json_str, buf);
+    // return true;
 }
 
 /**
@@ -419,7 +419,8 @@ auto serialize_key_value_pair_record(
         SchemaTree::TreeNodeLocator locator{
                 curr.get_parent_id(),
                 key.as<std::string_view>(),
-                schema_tree_node_type};
+                schema_tree_node_type
+        };
         SchemaTreeNode::id_t curr_id{};
         if (false == serialization_buf.m_schema_tree.has_node(locator, curr_id)) {
             curr_id = serialization_buf.m_schema_tree.insert_node(locator);

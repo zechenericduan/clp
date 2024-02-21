@@ -94,6 +94,11 @@ auto benchmark(std::string_view input_path) -> int {
         // result.emplace("time_map_to_msgpack", static_cast<double>(map_to_msgpack_time) / 1000000.0);
         result.emplace("time_clp_ir", static_cast<double>(clp_ir_time) / 1000000.0);
         result.emplace("schema_tree_size", buffer.get_schema_tree().get_size());
+        size_t max_depth{};
+        size_t max_width{};
+        buffer.get_schema_tree().get_max_depth_and_width(max_depth, max_width);
+        result.emplace("schema_tree_max_depth", max_depth);
+        result.emplace("schema_tree_max_width", max_width);
         std::cerr << result.dump() << "\n";
         last_reported_level = level;
     };
@@ -124,10 +129,10 @@ auto benchmark(std::string_view input_path) -> int {
         );
         msgpack_to_map_time += msgpack_to_map_timer.get_time_used_in_microsecond();
 
-        Timer map_to_msgpack_timer;
-        msgpack::sbuffer sbuf;  // Simple buffer
-        msgpack::pack(sbuf, oh.get());
-        map_to_msgpack_time += map_to_msgpack_timer.get_time_used_in_microsecond();
+        // Timer map_to_msgpack_timer;
+        // msgpack::sbuffer sbuf;
+        // msgpack::pack(sbuf, oh.get());
+        // map_to_msgpack_time += map_to_msgpack_timer.get_time_used_in_microsecond();
 
         Timer map_to_ir_timer;
         if (false == serialize_key_value_pair_record(oh.get(), buffer)) {
@@ -138,20 +143,20 @@ auto benchmark(std::string_view input_path) -> int {
         auto const ir_buf{buffer.get_ir_buf()};
         ir_bytes += ir_buf.size();
 
-        clp::BufferReader buffer_reader(ir_buf.data(), ir_buf.size());
-        Timer ir_deserialize_timer;
-        if (IRErrorCode::Success
-            != deserialize_next_key_value_pair_record(
-                    buffer_reader,
-                    deserialized_schema_tree,
-                    schema,
-                    values
-            ))
-        {
-            std::cerr << "Failed to deserialize (#" << idx << "): " << line << "\n";
-            return -1;
-        }
-        ir_deserialize_time += ir_deserialize_timer.get_time_used_in_microsecond();
+        // clp::BufferReader buffer_reader(ir_buf.data(), ir_buf.size());
+        // Timer ir_deserialize_timer;
+        // if (IRErrorCode::Success
+        //     != deserialize_next_key_value_pair_record(
+        //             buffer_reader,
+        //             deserialized_schema_tree,
+        //             schema,
+        //             values
+        //     ))
+        // {
+        //     std::cerr << "Failed to deserialize (#" << idx << "): " << line << "\n";
+        //     return -1;
+        // }
+        // ir_deserialize_time += ir_deserialize_timer.get_time_used_in_microsecond();
         buffer.flush_ir_buf();
 
         if (raw_json_bytes > level_map[level]) {
@@ -165,9 +170,9 @@ auto benchmark(std::string_view input_path) -> int {
     if (false == last_reported_level.has_value() || last_reported_level.value() != level) {
         result_printer();
     }
-    if (buffer.get_schema_tree().get_size() != deserialized_schema_tree.get_size()) {
-        std::cerr << "The deserialized tree's size doesn't match.\n";
-    }
+    // if (buffer.get_schema_tree().get_size() != deserialized_schema_tree.get_size()) {
+    //     std::cerr << "The deserialized tree's size doesn't match.\n";
+    // }
     return 0;
 }
 

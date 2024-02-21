@@ -1,20 +1,168 @@
 #include "utils.hpp"
 
+#include <array>
+#include <iostream>
+#include <span>
 #include <string_view>
 
-#include <span>
 #include <json/single_include/nlohmann/json.hpp>
 
 namespace clp_s::ffi::ir_stream {
 namespace {
+static constexpr std::uint8_t UTF8_ACCEPT = 0;
+static constexpr std::uint8_t UTF8_REJECT = 1;
+
+auto decode(uint8_t& state, std::uint32_t& codep, uint8_t byte) -> uint8_t {
+    static constexpr std::array<std::uint8_t, 400> utf8d
+            = {{
+                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  // 00..1F
+                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  // 20..3F
+                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  // 40..5F
+                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+                    0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  // 60..7F
+                    1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,
+                    1,   1,   1,   1,   1,   9,   9,   9,   9,   9,   9,
+                    9,   9,   9,   9,   9,   9,   9,   9,   9,   9,  // 80..9F
+                    7,   7,   7,   7,   7,   7,   7,   7,   7,   7,   7,
+                    7,   7,   7,   7,   7,   7,   7,   7,   7,   7,   7,
+                    7,   7,   7,   7,   7,   7,   7,   7,   7,   7,  // A0..BF
+                    8,   8,   2,   2,   2,   2,   2,   2,   2,   2,   2,
+                    2,   2,   2,   2,   2,   2,   2,   2,   2,   2,   2,
+                    2,   2,   2,   2,   2,   2,   2,   2,   2,   2,  // C0..DF
+                    0xA, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3,
+                    0x3, 0x3, 0x4, 0x3, 0x3,  // E0..EF
+                    0xB, 0x6, 0x6, 0x6, 0x5, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8,
+                    0x8, 0x8, 0x8, 0x8, 0x8,  // F0..FF
+                    0x0, 0x1, 0x2, 0x3, 0x5, 0x8, 0x7, 0x1, 0x1, 0x1, 0x4,
+                    0x6, 0x1, 0x1, 0x1, 0x1,  // s0..s0
+                    1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,
+                    1,   1,   1,   1,   1,   1,   0,   1,   1,   1,   1,
+                    1,   0,   1,   0,   1,   1,   1,   1,   1,   1,  // s1..s2
+                    1,   2,   1,   1,   1,   1,   1,   2,   1,   2,   1,
+                    1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,
+                    1,   2,   1,   1,   1,   1,   1,   1,   1,   1,  // s3..s4
+                    1,   2,   1,   1,   1,   1,   1,   1,   1,   2,   1,
+                    1,   1,   1,   1,   1,   1,   1,   1,   1,   1,   1,
+                    1,   3,   1,   3,   1,   1,   1,   1,   1,   1,  // s5..s6
+                    1,   3,   1,   1,   1,   1,   1,   3,   1,   3,   1,
+                    1,   1,   1,   1,   1,   1,   3,   1,   1,   1,   1,
+                    1,   1,   1,   1,   1,   1,   1,   1,   1,   1  // s7..s8
+            }};
+
+    std::uint8_t const type = utf8d[byte];
+
+    codep = (state != UTF8_ACCEPT) ? (byte & 0x3fu) | (codep << 6u) : (0xFFu >> type) & (byte);
+
+    std::size_t index = 256u + static_cast<size_t>(state) * 16u + static_cast<size_t>(type);
+    state = utf8d[index];
+    return state;
+}
+
 /**
  * Escapes a string and append it to the json string.
  * @param str
  * @param json_str
  */
-auto escape_and_append_string_to_json_str(std::string_view str, std::string& json_str) -> void {
+auto escape_and_append_string_to_json_str(std::string_view str, std::string& json_str) -> bool {
     // TODO: implement our own function to generate escaped string.
-    json_str += nlohmann::json(str).dump();
+    // auto const ref{nlohmann::json(str).dump()};
+
+    json_str.push_back('\"');
+    std::uint32_t codepoint{};
+    std::uint8_t state{UTF8_ACCEPT};
+    for (size_t i{0}; i < str.size(); ++i) {
+        auto const byte{static_cast<std::uint8_t>(str[i])};
+        switch (decode(state, codepoint, byte)) {
+            case UTF8_ACCEPT: {
+                switch (codepoint) {
+                    case 0x08:  // backspace
+                    {
+                        json_str.push_back('\\');
+                        json_str.push_back('b');
+                        break;
+                    }
+
+                    case 0x09:  // horizontal tab
+                    {
+                        json_str.push_back('\\');
+                        json_str.push_back('t');
+                        break;
+                    }
+
+                    case 0x0A:  // newline
+                    {
+                        json_str.push_back('\\');
+                        json_str.push_back('n');
+                        break;
+                    }
+
+                    case 0x0C:  // formfeed
+                    {
+                        json_str.push_back('\\');
+                        json_str.push_back('f');
+                        break;
+                    }
+
+                    case 0x0D:  // carriage return
+                    {
+                        json_str.push_back('\\');
+                        json_str.push_back('r');
+                        break;
+                    }
+
+                    case 0x22:  // quotation mark
+                    {
+                        json_str.push_back('\\');
+                        json_str.push_back('\"');
+                        break;
+                    }
+
+                    case 0x5C:  // reverse solidus
+                    {
+                        json_str.push_back('\\');
+                        json_str.push_back('\\');
+                        break;
+                    }
+
+                    default: {
+                        // escape control characters (0x00..0x1F) or, if
+                        // ensure_ascii parameter is used, non-ASCII characters
+                        if ((codepoint <= 0x1F)) {
+                            char string_buffer[7]{0};
+                            (std::snprintf)(
+                                    string_buffer,
+                                    7,
+                                    "\\u%04x",
+                                    static_cast<std::uint16_t>(codepoint)
+                            );
+                            json_str.append(string_buffer, 0, 6);
+                        } else {
+                            // copy byte to buffer (all previous bytes
+                            // been copied have in default case above)
+                            json_str.push_back(str[i]);
+                        }
+                        break;
+                    }
+                }
+                break;
+            }
+            case UTF8_REJECT:  // decode found invalid UTF-8 byte
+                return false;
+            default: {
+                json_str.push_back(str[i]);
+                break;
+            }
+        }
+    }
+    json_str.push_back('\"');
+    return true;
 }
 
 /**
@@ -40,7 +188,7 @@ auto escape_and_append_string_to_json_str(std::string_view str, std::string& jso
             json_str += obj.as<bool>() ? "true" : "false";
             break;
         case msgpack::type::STR:
-            escape_and_append_string_to_json_str(obj.as<std::string_view>(), json_str);
+            retval = escape_and_append_string_to_json_str(obj.as<std::string_view>(), json_str);
             break;
         case msgpack::type::FLOAT32:
         case msgpack::type::FLOAT:
