@@ -5,7 +5,6 @@
 #include <span>
 #include <vector>
 
-#include "../../Utils.hpp"
 #include "../SchemaTree.hpp"
 
 namespace clp_s::ffi::ir_stream {
