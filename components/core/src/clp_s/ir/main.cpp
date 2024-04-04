@@ -7,12 +7,12 @@
 #include <json/single_include/nlohmann/json.hpp>
 
 #include "../../clp/BufferReader.hpp"
-#include "../ffi/ir_stream/deserialization_methods.hpp"
-#include "../ffi/ir_stream/serialization_methods.hpp"
-#include "../ffi/ir_stream/SerializationBuffer.hpp"
 #include "../../clp/FileWriter.hpp"
 #include "../../clp/streaming_compression/zstd/Compressor.hpp"
 #include "../clp/ffi/ir_stream/encoding_methods.hpp"
+#include "../ffi/ir_stream/deserialization_methods.hpp"
+#include "../ffi/ir_stream/serialization_methods.hpp"
+#include "../ffi/ir_stream/SerializationBuffer.hpp"
 
 using clp_s::ffi::ir_stream::deserialize_next_key_value_pair_record;
 using clp_s::ffi::ir_stream::deserialize_record_as_json_str;
@@ -46,7 +46,8 @@ size_t level_map[]{
         10 * 1024 * 1024,
         100 * 1024 * 1024,
         1024 * 1024 * 1024,
-        10L * 1024 * 1024 * 1024};
+        10L * 1024 * 1024 * 1024
+};
 }  // namespace
 
 auto benchmark(std::string_view input_path) -> int {
@@ -85,13 +86,15 @@ auto benchmark(std::string_view input_path) -> int {
         //         "time_json_to_msgpack",
         //         static_cast<double>(json_to_msgpack_time) / 1000000.0
         // );
-        // result.emplace("time_msgpack_to_map", static_cast<double>(msgpack_to_map_time) / 1000000.0);
+        // result.emplace("time_msgpack_to_map", static_cast<double>(msgpack_to_map_time) /
+        // 1000000.0);
         result.emplace("time_map_to_ir", static_cast<double>(map_to_ir_time) / 1000000.0);
         // result.emplace(
         //         "time_ir_deserialization",
         //         static_cast<double>(ir_deserialize_time) / 1000000.0
         // );
-        // result.emplace("time_map_to_msgpack", static_cast<double>(map_to_msgpack_time) / 1000000.0);
+        // result.emplace("time_map_to_msgpack", static_cast<double>(map_to_msgpack_time) /
+        // 1000000.0);
         result.emplace("time_clp_ir", static_cast<double>(clp_ir_time) / 1000000.0);
         result.emplace("schema_tree_size", buffer.get_schema_tree().get_size());
         size_t max_depth{};
@@ -112,9 +115,15 @@ auto benchmark(std::string_view input_path) -> int {
         json_to_msgpack_time += json_to_msgpack_timer.get_time_used_in_microsecond();
 
         Timer clp_ir_timer;
-        if (false ==clp::ffi::ir_stream::four_byte_encoding::serialize_message(line, logtype, clp_ir_buf)) {
+        if (false
+            == clp::ffi::ir_stream::four_byte_encoding::serialize_message(
+                    line,
+                    logtype,
+                    clp_ir_buf
+            ))
+        {
             std::cerr << "Failed to encode CLP message with idx " << idx << "\n";
-            break; 
+            break;
         }
         clp_ir_time += clp_ir_timer.get_time_used_in_microsecond();
         clp_ir_buf.clear();

@@ -1,13 +1,12 @@
 #ifndef CLP_CLO_MONGODBCLIENT_HPP
 #define CLP_CLO_MONGODBCLIENT_HPP
 
-#include <queue>
-#include <string>
-
 #include <mongocxx/client.hpp>
 #include <mongocxx/collection.hpp>
 #include <mongocxx/exception/exception.hpp>
 #include <mongocxx/uri.hpp>
+#include <queue>
+#include <string>
 
 #include "../Defs.h"
 #include "../TraceableException.hpp"

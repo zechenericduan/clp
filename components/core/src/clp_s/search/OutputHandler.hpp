@@ -1,13 +1,12 @@
 #ifndef CLP_S_SEARCH_OUTPUTHANDLER_HPP
 #define CLP_S_SEARCH_OUTPUTHANDLER_HPP
 
-#include <string>
-
 #include <mongocxx/client.hpp>
 #include <mongocxx/collection.hpp>
 #include <mongocxx/exception/exception.hpp>
 #include <mongocxx/instance.hpp>
 #include <mongocxx/uri.hpp>
+#include <string>
 
 #include "../Defs.hpp"
 #include "../TraceableException.hpp"

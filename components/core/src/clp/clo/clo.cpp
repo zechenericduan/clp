@@ -1,8 +1,8 @@
 #include <iostream>
 #include <memory>
+#include <mongocxx/instance.hpp>
 
 #include <boost/filesystem.hpp>
-#include <mongocxx/instance.hpp>
 #include <spdlog/sinks/stdout_sinks.h>
 
 #include "../Defs.h"

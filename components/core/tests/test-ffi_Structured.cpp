@@ -17,12 +17,12 @@
 
 using clp_s::ffi::ir_stream::append_msgpack_array_to_json_str;
 using clp_s::ffi::ir_stream::append_msgpack_map_to_json_str;
-using clp_s::ffi::ir_stream::SerializationBuffer;
-using clp_s::ffi::ir_stream::serialize_end_of_stream;
-using clp_s::ffi::ir_stream::serialize_key_value_pair_record;
 using clp_s::ffi::ir_stream::deserialize_next_key_value_pair_record;
 using clp_s::ffi::ir_stream::deserialize_record_as_json_str;
 using clp_s::ffi::ir_stream::IRErrorCode;
+using clp_s::ffi::ir_stream::SerializationBuffer;
+using clp_s::ffi::ir_stream::serialize_end_of_stream;
+using clp_s::ffi::ir_stream::serialize_key_value_pair_record;
 using clp_s::ffi::SchemaTree;
 using clp_s::ffi::SchemaTreeNode;
 
@@ -197,8 +197,8 @@ TEST_CASE("structured_ir_decoding", "[ffi][structured]") {
         deserialized_item = nlohmann::json::parse(json_str);
         if (deserialized_item != ref_item) {
             std::cerr << "Idx: " << idx << "\n";
-            std::cerr << "Ref:\n" << ref_item.dump() << "\n"; 
-            std::cerr << "Deserialized:\n" << deserialized_item.dump() << "\n"; 
+            std::cerr << "Ref:\n" << ref_item.dump() << "\n";
+            std::cerr << "Deserialized:\n" << deserialized_item.dump() << "\n";
             std::cerr << "JSON str:\n" << json_str << "\n";
             failed = true;
             break;
