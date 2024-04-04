@@ -1,5 +1,6 @@
 #include "serialization_methods.hpp"
 
+#include <bit>
 #include <iostream>
 #include <span>
 #include <string_view>
