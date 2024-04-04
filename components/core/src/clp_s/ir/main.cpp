@@ -99,9 +99,9 @@ auto benchmark(std::string_view input_path) -> int {
         result.emplace("schema_tree_size", buffer.get_schema_tree().get_size());
         size_t max_depth{};
         size_t max_width{};
-        buffer.get_schema_tree().get_max_depth_and_width(max_depth, max_width);
-        result.emplace("schema_tree_max_depth", max_depth);
-        result.emplace("schema_tree_max_width", max_width);
+        // buffer.get_schema_tree().get_max_depth_and_width(max_depth, max_width);
+        // result.emplace("schema_tree_max_depth", max_depth);
+        // result.emplace("schema_tree_max_width", max_width);
         std::cerr << result.dump() << "\n";
         last_reported_level = level;
     };

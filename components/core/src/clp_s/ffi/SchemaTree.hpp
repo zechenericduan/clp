@@ -5,8 +5,6 @@
 #include <string_view>
 #include <vector>
 
-#include <absl/container/flat_hash_map.h>
-
 #include "../TraceableException.hpp"
 #include "SchemaTreeNode.hpp"
 
@@ -48,24 +46,20 @@ public:
                 std::string_view key_name,
                 SchemaTreeNode::Type type
         )
-                : m_tuple{parent_id, {key_name.begin(), key_name.end()}, type} {};
-        TreeNodeLocator(TreeNodeLocator const&) = default;
+                : m_parent_id{parent_id},
+                  m_key_name{key_name},
+                  m_type{type} {}
 
-        [[nodiscard]] auto get_parent_id() const -> SchemaTreeNode::id_t {
-            return std::get<0>(m_tuple);
-        }
+        [[nodiscard]] auto get_parent_id() const -> SchemaTreeNode::id_t { return m_parent_id; }
 
-        [[nodiscard]] auto get_key_name() const -> std::string_view { return std::get<1>(m_tuple); }
+        [[nodiscard]] auto get_key_name() const -> std::string_view { return m_key_name; }
 
-        [[nodiscard]] auto get_type() const -> SchemaTreeNode::Type { return std::get<2>(m_tuple); }
-
-        [[nodiscard]] auto get_tuple() const
-                -> std::tuple<SchemaTreeNode::id_t, std::string, SchemaTreeNode::Type> const& {
-            return m_tuple;
-        }
+        [[nodiscard]] auto get_type() const -> SchemaTreeNode::Type { return m_type; }
 
     private:
-        std::tuple<SchemaTreeNode::id_t, std::string, SchemaTreeNode::Type> m_tuple;
+        SchemaTreeNode::id_t m_parent_id;
+        std::string_view m_key_name;
+        SchemaTreeNode::Type m_type;
     };
 
     static constexpr SchemaTreeNode::id_t cRootId{0};
@@ -104,12 +98,20 @@ public:
      */
     [[nodiscard]] auto
     has_node(TreeNodeLocator const& location, SchemaTreeNode::id_t& node_id) const -> bool {
-        auto const it{m_node_map.find(location.get_tuple())};
-        if (m_node_map.end() == it) {
+        auto const parent_id{static_cast<size_t>(location.get_parent_id())};
+        if (m_tree_nodes.size() <= parent_id) {
             return false;
         }
-        node_id = it->second;
-        return true;
+        for (auto const child_id : m_tree_nodes[parent_id].get_children_ids()) {
+            auto const& node{m_tree_nodes[child_id]};
+            if (node.get_key_name() == location.get_key_name()
+                && node.get_type() == location.get_type())
+            {
+                node_id = child_id;
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -120,9 +122,9 @@ public:
      */
     [[maybe_unused]] auto insert_node(TreeNodeLocator const& location) -> SchemaTreeNode::id_t {
         SchemaTreeNode::id_t node_id{};
-        // if (has_node(location, node_id)) {
-        //     throw Exception(ErrorCodeFailure, __FILE__, __LINE__, "Tree Node already exists.");
-        // }
+        if (has_node(location, node_id)) {
+            throw Exception(ErrorCodeFailure, __FILE__, __LINE__, "Tree Node already exists.");
+        }
         node_id = m_tree_nodes.size();
         m_tree_nodes.emplace_back(
                 node_id,
@@ -131,7 +133,6 @@ public:
                 location.get_type()
         );
         m_tree_nodes[location.get_parent_id()].add_child(node_id);
-        m_node_map.emplace(location.get_tuple(), node_id);
         return node_id;
     }
 
@@ -185,30 +186,9 @@ public:
         return result;
     }
 
-    auto get_max_depth_and_width(size_t& max_depth, size_t& max_width) const -> void {
-        max_depth = 0;
-        max_width = 0;
-        std::vector<std::pair<size_t, size_t>> stack;
-        stack.emplace_back(cRootId, 0);
-        while (false == stack.empty()) {
-            auto const [id, depth]{stack.back()};
-            stack.pop_back();
-            max_depth = max_depth < depth ? depth : max_depth;
-            auto const& children{m_tree_nodes[id].get_children_ids()};
-            max_width = max_width < children.size() ? children.size() : max_width;
-            for (auto const i : children) {
-                stack.emplace_back(i, depth + 1);
-            }
-        }
-    }
-
 private:
     size_t m_snapshot_size{0};
     std::vector<SchemaTreeNode> m_tree_nodes;
-    absl::flat_hash_map<
-            std::tuple<SchemaTreeNode::id_t, std::string, SchemaTreeNode::Type>,
-            SchemaTreeNode::id_t>
-            m_node_map;
 };
 }  // namespace clp_s::ffi
 #endif
