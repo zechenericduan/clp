@@ -9,6 +9,7 @@
 #include "../../clp/BufferReader.hpp"
 #include "../../clp/FileWriter.hpp"
 #include "../../clp/streaming_compression/zstd/Compressor.hpp"
+#include "../../clp/streaming_compression/zstd/Decompressor.hpp"
 #include "../clp/ffi/ir_stream/encoding_methods.hpp"
 #include "../ffi/ir_stream/deserialization_methods.hpp"
 #include "../ffi/ir_stream/serialization_methods.hpp"
@@ -288,12 +289,50 @@ auto compress_raw(std::string_view input_path_view, size_t level) -> int {
     return 0;
 }
 
+auto deserialize(std::string input_path) -> int {
+    clp::FileWriter writer;
+    writer.open(input_path + ".json", clp::FileWriter::OpenMode::CREATE_FOR_WRITING);
+
+    clp::streaming_compression::zstd::Decompressor zstd_reader;
+    zstd_reader.open(input_path);
+
+    SchemaTree schema_tree;
+    std::vector<SchemaTreeNode::id_t> schema;
+    std::vector<std::optional<clp_s::ffi::ir_stream::Value>> values;
+    std::string json_str;
+
+    std::string line;
+    size_t idx{0};
+    bool failed{false};
+    while (true) {
+        auto const err{
+                deserialize_next_key_value_pair_record(zstd_reader, schema_tree, schema, values)
+        };
+        if (IRErrorCode::EndOfStream == err) {
+            break;
+        }
+        if (IRErrorCode::Success != err) {
+            std::cerr << idx << " Failed to deserialize IR to kv pairs.\n";
+            return -1;
+        }
+        if (false == deserialize_record_as_json_str(schema_tree, schema, values, json_str)) {
+            std::cerr << idx << " Failed to serialize JSON string from kv pairs.\n";
+            return -1;
+        }
+        json_str.push_back('\n');
+        writer.write_string(json_str);
+        ++idx;
+    }
+    writer.close();
+    return 0;
+}
+
 auto main(int argc, char const* argv[]) -> int {
     if (1 >= argc) {
         std::cerr << "Error: Incorrect Args.\n";
     }
     std::string_view input_path{argv[1]};
-    return benchmark(input_path);
+    // return benchmark(input_path);
     // int ret{};
     // ret = compress_raw(input_path, 3);
     // if (0 != ret) {
@@ -303,5 +342,6 @@ auto main(int argc, char const* argv[]) -> int {
     // if (0 != ret) {
     //     return ret;
     // }
+    deserialize(std::string{input_path.begin(), input_path.end()});
     return 0;
 }
